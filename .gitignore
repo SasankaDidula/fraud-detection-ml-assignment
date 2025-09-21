@@ -1,1 +1,4 @@
-data/Fraud.csv
+data/
+*.csv
+*.zip
+*.ipynb_checkpoints/
