@@ -19,7 +19,7 @@
     },
     {
       "cell_type": "code",
-      "execution_count": 108,
+      "execution_count": 125,
       "id": "3889742f",
       "metadata": {},
       "outputs": [],
@@ -39,7 +39,7 @@
     },
     {
       "cell_type": "code",
-      "execution_count": 109,
+      "execution_count": 126,
       "id": "cbd89585",
       "metadata": {},
       "outputs": [],
@@ -98,7 +98,7 @@
     },
     {
       "cell_type": "code",
-      "execution_count": 110,
+      "execution_count": 127,
       "id": "5266933e",
       "metadata": {},
       "outputs": [
@@ -227,7 +227,7 @@
     },
     {
       "cell_type": "code",
-      "execution_count": 111,
+      "execution_count": 128,
       "id": "d71cdc6d",
       "metadata": {},
       "outputs": [
@@ -364,7 +364,7 @@
               "4  M1230701703             0.0             0.0        0               0  "
             ]
           },
-          "execution_count": 111,
+          "execution_count": 128,
           "metadata": {},
           "output_type": "execute_result"
         }
@@ -460,7 +460,7 @@
     },
     {
       "cell_type": "code",
-      "execution_count": 112,
+      "execution_count": 129,
       "id": "95fb9752",
       "metadata": {},
       "outputs": [
@@ -529,7 +529,7 @@
     },
     {
       "cell_type": "code",
-      "execution_count": 113,
+      "execution_count": 130,
       "id": "9688e344",
       "metadata": {},
       "outputs": [
@@ -599,7 +599,7 @@
     },
     {
       "cell_type": "code",
-      "execution_count": 114,
+      "execution_count": 131,
       "id": "bbc11ffb",
       "metadata": {},
       "outputs": [
@@ -908,7 +908,7 @@
     },
     {
       "cell_type": "code",
-      "execution_count": 115,
+      "execution_count": 132,
       "id": "25a9f1f7",
       "metadata": {},
       "outputs": [
@@ -1004,7 +1004,7 @@
     },
     {
       "cell_type": "code",
-      "execution_count": 116,
+      "execution_count": 133,
       "id": "9e370499",
       "metadata": {},
       "outputs": [
@@ -1145,7 +1145,7 @@
     },
     {
       "cell_type": "code",
-      "execution_count": null,
+      "execution_count": 134,
       "id": "f8eb7484",
       "metadata": {},
       "outputs": [
@@ -1359,19 +1359,10 @@
     },
     {
       "cell_type": "code",
-      "execution_count": null,
+      "execution_count": 135,
       "id": "b5b0f9ab",
       "metadata": {},
-      "outputs": [
-        {
-          "name": "stdout",
-          "output_type": "stream",
-          "text": [
-            "Train shape: (492483, 17) | Test shape: (7517, 17)\n",
-            "Fraud rate (train): 0.00046905172361279474 | (test): 0.0002660635891978183\n"
-          ]
-        }
-      ],
+      "outputs": [],
       "source": [
         "# Build X/y from RAW columns; preprocessing/encoding happen in your Pipeline\n",
         "feature_cols = numeric_feats + categorical_feats\n",
@@ -1411,7 +1402,7 @@
     },
     {
       "cell_type": "code",
-      "execution_count": 119,
+      "execution_count": 136,
       "id": "29907b26",
       "metadata": {},
       "outputs": [
@@ -1729,7 +1720,7 @@
     },
     {
       "cell_type": "code",
-      "execution_count": 120,
+      "execution_count": 137,
       "id": "27423b5a",
       "metadata": {},
       "outputs": [],
