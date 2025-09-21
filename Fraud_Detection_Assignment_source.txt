@@ -1,0 +1,952 @@
+{
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "id": "12076d98",
+      "metadata": {},
+      "source": [
+        "\n",
+        "# Fraud Detection in Financial Transactions (Non-Deep Learning)\n",
+        "\n",
+        "**Course:** IT5022 - Fundamentals of Machine Learning (MSc AI)  \n",
+        "**Student:** MS25948592 \u2014 N.G.S.D. Nanayakkara  \n",
+        "**Dataset:** [Fraudulent Transactions Data (Kaggle)](https://www.kaggle.com/datasets/chitwanmanchanda/fraudulent-transactions-data)\n",
+        "\n",
+        "**Models:** Logistic Regression (baseline, interpretable) & Random Forest (nonlinear, robust)\n",
+        "\n",
+        "> This notebook is optimized for large data (\u22486.3M rows). If your machine has limited RAM, enable **QUICK_EXPERIMENT** to downsample while preserving fraud cases.\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 1,
+      "id": "3889742f",
+      "metadata": {},
+      "outputs": [],
+      "source": [
+        "\n",
+        "# If you need to install missing packages, uncomment and run:\n",
+        "# !pip install pandas numpy scikit-learn matplotlib plotly imbalanced-learn polars\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 19,
+      "id": "cbd89585",
+      "metadata": {},
+      "outputs": [],
+      "source": [
+        "\n",
+        "import os\n",
+        "import gc\n",
+        "import numpy as np\n",
+        "import pandas as pd\n",
+        "import zipfile\n",
+        "from pathlib import Path\n",
+        "\n",
+        "try:\n",
+        "    import polars as pl\n",
+        "    POLARS_AVAILABLE = True\n",
+        "except Exception:\n",
+        "    POLARS_AVAILABLE = False\n",
+        "\n",
+        "from sklearn.model_selection import train_test_split\n",
+        "from sklearn.preprocessing import OneHotEncoder, StandardScaler\n",
+        "from sklearn.compose import ColumnTransformer\n",
+        "from sklearn.pipeline import Pipeline\n",
+        "from sklearn.metrics import (\n",
+        "    roc_auc_score, average_precision_score, confusion_matrix, classification_report,\n",
+        "    RocCurveDisplay, PrecisionRecallDisplay\n",
+        ")\n",
+        "from sklearn.linear_model import LogisticRegression\n",
+        "from sklearn.ensemble import RandomForestClassifier\n",
+        "from sklearn.utils.class_weight import compute_class_weight\n",
+        "\n",
+        "import matplotlib.pyplot as plt\n",
+        "\n",
+        "RANDOM_STATE = 42\n",
+        "np.random.seed(RANDOM_STATE)\n"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "id": "8ce9c619",
+      "metadata": {},
+      "source": [
+        "## Configuration"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 21,
+      "id": "5266933e",
+      "metadata": {},
+      "outputs": [
+        {
+          "name": "stdout",
+          "output_type": "stream",
+          "text": [
+            "CSV already exists: data\\Fraud.csv\n"
+          ]
+        }
+      ],
+      "source": [
+        "QUICK_EXPERIMENT = True\n",
+        "MAX_ROWS = 500_000\n",
+        "TRAIN_CUTOFF_STEP = 600\n",
+        "\n",
+        "# Where to save dataset\n",
+        "DATA_DIR = Path(\"./data\")\n",
+        "DATA_DIR.mkdir(exist_ok=True)\n",
+        "\n",
+        "# Check if CSV already exists\n",
+        "CSV_FILENAME = \"Fraud.csv\"\n",
+        "csv_path = DATA_DIR / CSV_FILENAME\n",
+        "\n",
+        "if not csv_path.exists():\n",
+        "    print(\"CSV not found locally, downloading from Kaggle...\")\n",
+        "    os.system(\"kaggle datasets download -d chitwanmanchanda/fraudulent-transactions-data -p data\")\n",
+        "    # Extract\n",
+        "    for file in DATA_DIR.glob(\"*.zip\"):\n",
+        "        with zipfile.ZipFile(file, \"r\") as zip_ref:\n",
+        "            zip_ref.extractall(DATA_DIR)\n",
+        "        file.unlink()  # remove zip after extract\n",
+        "else:\n",
+        "    print(\"CSV already exists:\", csv_path)\n"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "id": "11c2c52a",
+      "metadata": {},
+      "source": [
+        "## Load Data (Memory\u2013Aware)"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 22,
+      "id": "d71cdc6d",
+      "metadata": {},
+      "outputs": [
+        {
+          "name": "stdout",
+          "output_type": "stream",
+          "text": [
+            "(6362620, 11)\n"
+          ]
+        },
+        {
+          "data": {
+            "text/html": [
+              "<div>\n",
+              "<style scoped>\n",
+              "    .dataframe tbody tr th:only-of-type {\n",
+              "        vertical-align: middle;\n",
+              "    }\n",
+              "\n",
+              "    .dataframe tbody tr th {\n",
+              "        vertical-align: top;\n",
+              "    }\n",
+              "\n",
+              "    .dataframe thead th {\n",
+              "        text-align: right;\n",
+              "    }\n",
+              "</style>\n",
+              "<table border=\"1\" class=\"dataframe\">\n",
+              "  <thead>\n",
+              "    <tr style=\"text-align: right;\">\n",
+              "      <th></th>\n",
+              "      <th>step</th>\n",
+              "      <th>type</th>\n",
+              "      <th>amount</th>\n",
+              "      <th>nameOrig</th>\n",
+              "      <th>oldbalanceOrg</th>\n",
+              "      <th>newbalanceOrig</th>\n",
+              "      <th>nameDest</th>\n",
+              "      <th>oldbalanceDest</th>\n",
+              "      <th>newbalanceDest</th>\n",
+              "      <th>isFraud</th>\n",
+              "      <th>isFlaggedFraud</th>\n",
+              "    </tr>\n",
+              "  </thead>\n",
+              "  <tbody>\n",
+              "    <tr>\n",
+              "      <th>0</th>\n",
+              "      <td>1</td>\n",
+              "      <td>PAYMENT</td>\n",
+              "      <td>9839.639648</td>\n",
+              "      <td>C1231006815</td>\n",
+              "      <td>170136.0</td>\n",
+              "      <td>160296.359375</td>\n",
+              "      <td>M1979787155</td>\n",
+              "      <td>0.0</td>\n",
+              "      <td>0.0</td>\n",
+              "      <td>0</td>\n",
+              "      <td>0</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>1</th>\n",
+              "      <td>1</td>\n",
+              "      <td>PAYMENT</td>\n",
+              "      <td>1864.280029</td>\n",
+              "      <td>C1666544295</td>\n",
+              "      <td>21249.0</td>\n",
+              "      <td>19384.720703</td>\n",
+              "      <td>M2044282225</td>\n",
+              "      <td>0.0</td>\n",
+              "      <td>0.0</td>\n",
+              "      <td>0</td>\n",
+              "      <td>0</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>2</th>\n",
+              "      <td>1</td>\n",
+              "      <td>TRANSFER</td>\n",
+              "      <td>181.000000</td>\n",
+              "      <td>C1305486145</td>\n",
+              "      <td>181.0</td>\n",
+              "      <td>0.000000</td>\n",
+              "      <td>C553264065</td>\n",
+              "      <td>0.0</td>\n",
+              "      <td>0.0</td>\n",
+              "      <td>1</td>\n",
+              "      <td>0</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>3</th>\n",
+              "      <td>1</td>\n",
+              "      <td>CASH_OUT</td>\n",
+              "      <td>181.000000</td>\n",
+              "      <td>C840083671</td>\n",
+              "      <td>181.0</td>\n",
+              "      <td>0.000000</td>\n",
+              "      <td>C38997010</td>\n",
+              "      <td>21182.0</td>\n",
+              "      <td>0.0</td>\n",
+              "      <td>1</td>\n",
+              "      <td>0</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>4</th>\n",
+              "      <td>1</td>\n",
+              "      <td>PAYMENT</td>\n",
+              "      <td>11668.139648</td>\n",
+              "      <td>C2048537720</td>\n",
+              "      <td>41554.0</td>\n",
+              "      <td>29885.859375</td>\n",
+              "      <td>M1230701703</td>\n",
+              "      <td>0.0</td>\n",
+              "      <td>0.0</td>\n",
+              "      <td>0</td>\n",
+              "      <td>0</td>\n",
+              "    </tr>\n",
+              "  </tbody>\n",
+              "</table>\n",
+              "</div>"
+            ],
+            "text/plain": [
+              "   step      type        amount     nameOrig  oldbalanceOrg  newbalanceOrig  \\\n",
+              "0     1   PAYMENT   9839.639648  C1231006815       170136.0   160296.359375   \n",
+              "1     1   PAYMENT   1864.280029  C1666544295        21249.0    19384.720703   \n",
+              "2     1  TRANSFER    181.000000  C1305486145          181.0        0.000000   \n",
+              "3     1  CASH_OUT    181.000000   C840083671          181.0        0.000000   \n",
+              "4     1   PAYMENT  11668.139648  C2048537720        41554.0    29885.859375   \n",
+              "\n",
+              "      nameDest  oldbalanceDest  newbalanceDest  isFraud  isFlaggedFraud  \n",
+              "0  M1979787155             0.0             0.0        0               0  \n",
+              "1  M2044282225             0.0             0.0        0               0  \n",
+              "2   C553264065             0.0             0.0        1               0  \n",
+              "3    C38997010         21182.0             0.0        1               0  \n",
+              "4  M1230701703             0.0             0.0        0               0  "
+            ]
+          },
+          "execution_count": 22,
+          "metadata": {},
+          "output_type": "execute_result"
+        }
+      ],
+      "source": [
+        "\n",
+        "def read_data_pandas(path: str) -> pd.DataFrame:\n",
+        "    \"\"\"Memory-aware CSV reader with dtype hints to reduce RAM usage.\"\"\"\n",
+        "    dtype_map = {\n",
+        "        \"step\": \"int32\",\n",
+        "        \"type\": \"category\",\n",
+        "        \"amount\": \"float32\",\n",
+        "        \"nameOrig\": \"category\",\n",
+        "        \"oldbalanceOrg\": \"float32\",\n",
+        "        \"newbalanceOrig\": \"float32\",\n",
+        "        \"nameDest\": \"category\",\n",
+        "        \"oldbalanceDest\": \"float32\",\n",
+        "        \"newbalanceDest\": \"float32\",\n",
+        "        \"isFraud\": \"int8\",\n",
+        "        \"isFlaggedFraud\": \"int8\",\n",
+        "    }\n",
+        "    usecols = list(dtype_map.keys())\n",
+        "    df = pd.read_csv(path, usecols=usecols, dtype=dtype_map)\n",
+        "    return df\n",
+        "\n",
+        "csv_path = os.path.join(DATA_DIR, CSV_FILENAME)\n",
+        "df = read_data_pandas(csv_path)\n",
+        "print(df.shape)\n",
+        "df.head()\n"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "id": "9925c204",
+      "metadata": {},
+      "source": [
+        "## Exploratory Data Analysis (EDA)"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 23,
+      "id": "95fb9752",
+      "metadata": {},
+      "outputs": [
+        {
+          "name": "stdout",
+          "output_type": "stream",
+          "text": [
+            "Columns: ['step', 'type', 'amount', 'nameOrig', 'oldbalanceOrg', 'newbalanceOrig', 'nameDest', 'oldbalanceDest', 'newbalanceDest', 'isFraud', 'isFlaggedFraud']\n",
+            "\n",
+            "dtypes:\n",
+            " step                 int32\n",
+            "type              category\n",
+            "amount             float32\n",
+            "nameOrig          category\n",
+            "oldbalanceOrg      float32\n",
+            "newbalanceOrig     float32\n",
+            "nameDest          category\n",
+            "oldbalanceDest     float32\n",
+            "newbalanceDest     float32\n",
+            "isFraud               int8\n",
+            "isFlaggedFraud        int8\n",
+            "dtype: object\n",
+            "\n",
+            "Null counts:\n",
+            " step              0\n",
+            "type              0\n",
+            "amount            0\n",
+            "nameOrig          0\n",
+            "oldbalanceOrg     0\n",
+            "newbalanceOrig    0\n",
+            "nameDest          0\n",
+            "oldbalanceDest    0\n",
+            "newbalanceDest    0\n",
+            "isFraud           0\n",
+            "isFlaggedFraud    0\n",
+            "dtype: int64\n",
+            "\n",
+            "Class distribution (isFraud):\n",
+            " isFraud\n",
+            "0    0.998709\n",
+            "1    0.001291\n",
+            "Name: proportion, dtype: float64\n",
+            "\n",
+            "Transaction type distribution:\n",
+            " type\n",
+            "CASH_OUT    0.351663\n",
+            "PAYMENT     0.338146\n",
+            "CASH_IN     0.219923\n",
+            "TRANSFER    0.083756\n",
+            "DEBIT       0.006512\n",
+            "Name: proportion, dtype: float64\n"
+          ]
+        }
+      ],
+      "source": [
+        "\n",
+        "print(\"Columns:\", df.columns.tolist())\n",
+        "print(\"\\ndtypes:\\n\", df.dtypes)\n",
+        "print(\"\\nNull counts:\\n\", df.isna().sum())\n",
+        "print(\"\\nClass distribution (isFraud):\\n\", df['isFraud'].value_counts(normalize=True))\n",
+        "print(\"\\nTransaction type distribution:\\n\", df['type'].value_counts(normalize=True))\n"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "id": "1b6c6163",
+      "metadata": {},
+      "source": [
+        "## Feature Engineering"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 24,
+      "id": "9e370499",
+      "metadata": {},
+      "outputs": [
+        {
+          "data": {
+            "text/html": [
+              "<div>\n",
+              "<style scoped>\n",
+              "    .dataframe tbody tr th:only-of-type {\n",
+              "        vertical-align: middle;\n",
+              "    }\n",
+              "\n",
+              "    .dataframe tbody tr th {\n",
+              "        vertical-align: top;\n",
+              "    }\n",
+              "\n",
+              "    .dataframe thead th {\n",
+              "        text-align: right;\n",
+              "    }\n",
+              "</style>\n",
+              "<table border=\"1\" class=\"dataframe\">\n",
+              "  <thead>\n",
+              "    <tr style=\"text-align: right;\">\n",
+              "      <th></th>\n",
+              "      <th>step</th>\n",
+              "      <th>type</th>\n",
+              "      <th>amount</th>\n",
+              "      <th>oldbalanceOrg</th>\n",
+              "      <th>newbalanceOrig</th>\n",
+              "      <th>oldbalanceDest</th>\n",
+              "      <th>newbalanceDest</th>\n",
+              "      <th>isFraud</th>\n",
+              "      <th>isFlaggedFraud</th>\n",
+              "      <th>tx_delta_orig</th>\n",
+              "      <th>tx_delta_dest</th>\n",
+              "    </tr>\n",
+              "  </thead>\n",
+              "  <tbody>\n",
+              "    <tr>\n",
+              "      <th>0</th>\n",
+              "      <td>1</td>\n",
+              "      <td>PAYMENT</td>\n",
+              "      <td>9839.639648</td>\n",
+              "      <td>170136.0</td>\n",
+              "      <td>160296.359375</td>\n",
+              "      <td>0.0</td>\n",
+              "      <td>0.0</td>\n",
+              "      <td>0</td>\n",
+              "      <td>0</td>\n",
+              "      <td>0.000977</td>\n",
+              "      <td>0.0</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>1</th>\n",
+              "      <td>1</td>\n",
+              "      <td>PAYMENT</td>\n",
+              "      <td>1864.280029</td>\n",
+              "      <td>21249.0</td>\n",
+              "      <td>19384.720703</td>\n",
+              "      <td>0.0</td>\n",
+              "      <td>0.0</td>\n",
+              "      <td>0</td>\n",
+              "      <td>0</td>\n",
+              "      <td>-0.000732</td>\n",
+              "      <td>0.0</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>2</th>\n",
+              "      <td>1</td>\n",
+              "      <td>TRANSFER</td>\n",
+              "      <td>181.000000</td>\n",
+              "      <td>181.0</td>\n",
+              "      <td>0.000000</td>\n",
+              "      <td>0.0</td>\n",
+              "      <td>0.0</td>\n",
+              "      <td>1</td>\n",
+              "      <td>0</td>\n",
+              "      <td>0.000000</td>\n",
+              "      <td>0.0</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>3</th>\n",
+              "      <td>1</td>\n",
+              "      <td>CASH_OUT</td>\n",
+              "      <td>181.000000</td>\n",
+              "      <td>181.0</td>\n",
+              "      <td>0.000000</td>\n",
+              "      <td>21182.0</td>\n",
+              "      <td>0.0</td>\n",
+              "      <td>1</td>\n",
+              "      <td>0</td>\n",
+              "      <td>0.000000</td>\n",
+              "      <td>-21182.0</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>4</th>\n",
+              "      <td>1</td>\n",
+              "      <td>PAYMENT</td>\n",
+              "      <td>11668.139648</td>\n",
+              "      <td>41554.0</td>\n",
+              "      <td>29885.859375</td>\n",
+              "      <td>0.0</td>\n",
+              "      <td>0.0</td>\n",
+              "      <td>0</td>\n",
+              "      <td>0</td>\n",
+              "      <td>0.000977</td>\n",
+              "      <td>0.0</td>\n",
+              "    </tr>\n",
+              "  </tbody>\n",
+              "</table>\n",
+              "</div>"
+            ],
+            "text/plain": [
+              "   step      type        amount  oldbalanceOrg  newbalanceOrig  \\\n",
+              "0     1   PAYMENT   9839.639648       170136.0   160296.359375   \n",
+              "1     1   PAYMENT   1864.280029        21249.0    19384.720703   \n",
+              "2     1  TRANSFER    181.000000          181.0        0.000000   \n",
+              "3     1  CASH_OUT    181.000000          181.0        0.000000   \n",
+              "4     1   PAYMENT  11668.139648        41554.0    29885.859375   \n",
+              "\n",
+              "   oldbalanceDest  newbalanceDest  isFraud  isFlaggedFraud  tx_delta_orig  \\\n",
+              "0             0.0             0.0        0               0       0.000977   \n",
+              "1             0.0             0.0        0               0      -0.000732   \n",
+              "2             0.0             0.0        1               0       0.000000   \n",
+              "3         21182.0             0.0        1               0       0.000000   \n",
+              "4             0.0             0.0        0               0       0.000977   \n",
+              "\n",
+              "   tx_delta_dest  \n",
+              "0            0.0  \n",
+              "1            0.0  \n",
+              "2            0.0  \n",
+              "3       -21182.0  \n",
+              "4            0.0  "
+            ]
+          },
+          "execution_count": 24,
+          "metadata": {},
+          "output_type": "execute_result"
+        }
+      ],
+      "source": [
+        "\n",
+        "df = df.copy()\n",
+        "df['tx_delta_orig'] = (df['oldbalanceOrg'] - df['newbalanceOrig'] - df['amount']).astype('float32')\n",
+        "df['tx_delta_dest'] = (df['newbalanceDest'] - df['oldbalanceDest']).astype('float32')\n",
+        "df.drop(columns=['nameOrig', 'nameDest'], inplace=True)\n",
+        "df.head()\n"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "id": "494a8ad8",
+      "metadata": {},
+      "source": [
+        "## Time-Aware Train/Test Split"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 25,
+      "id": "f8eb7484",
+      "metadata": {},
+      "outputs": [
+        {
+          "name": "stdout",
+          "output_type": "stream",
+          "text": [
+            "Train shape: (6259047, 11), Test shape: (103573, 11)\n",
+            "Train fraud rate: 0.0010565506218438686 | Test fraud rate: 0.015448041477991368\n"
+          ]
+        }
+      ],
+      "source": [
+        "\n",
+        "train_mask = df['step'] <= TRAIN_CUTOFF_STEP\n",
+        "test_mask = df['step'] > TRAIN_CUTOFF_STEP\n",
+        "\n",
+        "df_train = df.loc[train_mask].reset_index(drop=True)\n",
+        "df_test = df.loc[test_mask].reset_index(drop=True)\n",
+        "\n",
+        "print(f\"Train shape: {df_train.shape}, Test shape: {df_test.shape}\")\n",
+        "print(\"Train fraud rate:\", df_train['isFraud'].mean(), \"| Test fraud rate:\", df_test['isFraud'].mean())\n"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "id": "29a9e4e2",
+      "metadata": {},
+      "source": [
+        "### Optional: Quick Experiment Downsampling"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "id": "9b3d1c98",
+      "metadata": {},
+      "outputs": [],
+      "source": [
+        "\n",
+        "def stratified_downsample(df_, y_col, max_rows, random_state=42):\n",
+        "    total = len(df_)\n",
+        "    if total <= max_rows:\n",
+        "        return df_\n",
+        "    minority = df_[df_[y_col] == 1]\n",
+        "    majority = df_[df_[y_col] == 0]\n",
+        "    remaining = max_rows - len(minority)\n",
+        "    remaining = max(remaining, 1000)\n",
+        "    maj_sample = majority.sample(n=min(remaining, len(majority)), random_state=random_state)\n",
+        "    return pd.concat([minority, maj_sample], axis=0).sample(frac=1.0, random_state=random_state).reset_index(drop=True)\n",
+        "\n",
+        "if QUICK_EXPERIMENT:\n",
+        "    df_train = stratified_downsample(df_train, 'isFraud', MAX_ROWS, RANDOM_STATE)\n",
+        "    df_test = stratified_downsample(df_test, 'isFraud', max(MAX_ROWS//4, 250_000), RANDOM_STATE)\n",
+        "    print(\"After downsampling -> Train:\", df_train.shape, \"Test:\", df_test.shape)\n"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "id": "87f01a11",
+      "metadata": {},
+      "source": [
+        "## Preprocessing Pipeline"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "id": "c75df164",
+      "metadata": {},
+      "outputs": [],
+      "source": [
+        "\n",
+        "target_col = 'isFraud'\n",
+        "categorical_cols = ['type']\n",
+        "numeric_cols = [c for c in df_train.columns if c not in categorical_cols + [target_col]]\n",
+        "\n",
+        "X_train = df_train[categorical_cols + numeric_cols].copy()\n",
+        "y_train = df_train[target_col].astype('int8').copy()\n",
+        "X_test = df_test[categorical_cols + numeric_cols].copy()\n",
+        "y_test = df_test[target_col].astype('int8').copy()\n",
+        "\n",
+        "categorical_transformer = OneHotEncoder(handle_unknown='ignore', sparse_output=False)\n",
+        "numeric_transformer = StandardScaler(with_mean=False)\n",
+        "\n",
+        "preprocess = ColumnTransformer(\n",
+        "    transformers=[\n",
+        "        ('cat', categorical_transformer, categorical_cols),\n",
+        "        ('num', numeric_transformer, numeric_cols),\n",
+        "    ],\n",
+        "    remainder='drop'\n",
+        ")\n"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "id": "d619c03b",
+      "metadata": {},
+      "source": [
+        "### Class Imbalance Strategy"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "id": "b1837266",
+      "metadata": {},
+      "outputs": [],
+      "source": [
+        "\n",
+        "classes = np.array([0, 1])\n",
+        "class_weights = compute_class_weight(class_weight='balanced', classes=classes, y=y_train)\n",
+        "CLASS_WEIGHT_DICT = {0: class_weights[0], 1: class_weights[1]}\n",
+        "CLASS_WEIGHT_DICT\n"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "id": "2a0e0b90",
+      "metadata": {},
+      "source": [
+        "## Model 1 \u2014 Logistic Regression"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "id": "7d4a944f",
+      "metadata": {},
+      "outputs": [],
+      "source": [
+        "\n",
+        "log_reg = Pipeline(steps=[\n",
+        "    ('preprocess', preprocess),\n",
+        "    ('clf', LogisticRegression(\n",
+        "        max_iter=200,\n",
+        "        class_weight=CLASS_WEIGHT_DICT,\n",
+        "        solver='lbfgs'\n",
+        "    ))\n",
+        "])\n",
+        "\n",
+        "log_reg.fit(X_train, y_train)\n",
+        "y_proba_lr = log_reg.predict_proba(X_test)[:, 1]\n",
+        "y_pred_lr = (y_proba_lr >= 0.5).astype(int)\n",
+        "\n",
+        "roc_lr = roc_auc_score(y_test, y_proba_lr)\n",
+        "pr_lr = average_precision_score(y_test, y_proba_lr)\n",
+        "\n",
+        "print(f\"LogReg ROC-AUC: {roc_lr:.4f} | PR-AUC: {pr_lr:.4f}\")\n",
+        "print(\"\\nConfusion Matrix (0.5):\\n\", confusion_matrix(y_test, y_pred_lr))\n",
+        "print(\"\\nClassification Report (0.5):\\n\", classification_report(y_test, y_pred_lr, digits=4))\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "id": "a46e56c8",
+      "metadata": {},
+      "outputs": [],
+      "source": [
+        "\n",
+        "plt.figure()\n",
+        "RocCurveDisplay.from_predictions(y_test, y_proba_lr)\n",
+        "plt.title(\"Logistic Regression \u2014 ROC Curve\")\n",
+        "plt.show()\n",
+        "\n",
+        "plt.figure()\n",
+        "PrecisionRecallDisplay.from_predictions(y_test, y_proba_lr)\n",
+        "plt.title(\"Logistic Regression \u2014 Precision-Recall Curve\")\n",
+        "plt.show()\n"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "id": "45630b63",
+      "metadata": {},
+      "source": [
+        "## Model 2 \u2014 Random Forest"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "id": "e01ab133",
+      "metadata": {},
+      "outputs": [],
+      "source": [
+        "\n",
+        "rf = Pipeline(steps=[\n",
+        "    ('preprocess', preprocess),\n",
+        "    ('clf', RandomForestClassifier(\n",
+        "        n_estimators=200,\n",
+        "        max_depth=None,\n",
+        "        n_jobs=-1,\n",
+        "        random_state=RANDOM_STATE,\n",
+        "        class_weight=CLASS_WEIGHT_DICT\n",
+        "    ))\n",
+        "])\n",
+        "\n",
+        "rf.fit(X_train, y_train)\n",
+        "y_proba_rf = rf.predict_proba(X_test)[:, 1]\n",
+        "y_pred_rf = (y_proba_rf >= 0.5).astype(int)\n",
+        "\n",
+        "roc_rf = roc_auc_score(y_test, y_proba_rf)\n",
+        "pr_rf = average_precision_score(y_test, y_proba_rf)\n",
+        "\n",
+        "print(f\"RandomForest ROC-AUC: {roc_rf:.4f} | PR-AUC: {pr_rf:.4f}\")\n",
+        "print(\"\\nConfusion Matrix (0.5):\\n\", confusion_matrix(y_test, y_pred_rf))\n",
+        "print(\"\\nClassification Report (0.5):\\n\", classification_report(y_test, y_pred_rf, digits=4))\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "id": "6879f3c2",
+      "metadata": {},
+      "outputs": [],
+      "source": [
+        "\n",
+        "plt.figure()\n",
+        "RocCurveDisplay.from_predictions(y_test, y_proba_rf)\n",
+        "plt.title(\"Random Forest \u2014 ROC Curve\")\n",
+        "plt.show()\n",
+        "\n",
+        "plt.figure()\n",
+        "PrecisionRecallDisplay.from_predictions(y_test, y_proba_rf)\n",
+        "plt.title(\"Random Forest \u2014 Precision-Recall Curve\")\n",
+        "plt.show()\n"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "id": "f03b6f8b",
+      "metadata": {},
+      "source": [
+        "### Threshold Tuning (Business-Driven)"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "id": "549528e6",
+      "metadata": {},
+      "outputs": [],
+      "source": [
+        "\n",
+        "def evaluate_thresholds(y_true, y_scores, thresholds=None):\n",
+        "    if thresholds is None:\n",
+        "        thresholds = np.linspace(0.01, 0.99, 25)\n",
+        "    rows = []\n",
+        "    for t in thresholds:\n",
+        "        pred = (y_scores >= t).astype(int)\n",
+        "        tn, fp, fn, tp = confusion_matrix(y_true, pred).ravel()\n",
+        "        precision = tp / (tp + fp + 1e-9)\n",
+        "        recall = tp / (tp + fn + 1e-9)\n",
+        "        f1 = 2 * precision * recall / (precision + recall + 1e-9)\n",
+        "        rows.append({\"threshold\": t, \"precision\": precision, \"recall\": recall, \"f1\": f1, \"tp\": tp, \"fp\": fp, \"fn\": fn, \"tn\": tn})\n",
+        "    return pd.DataFrame(rows)\n",
+        "\n",
+        "thres_table_lr = evaluate_thresholds(y_test, y_proba_lr)\n",
+        "thres_table_rf = evaluate_thresholds(y_test, y_proba_rf)\n",
+        "\n",
+        "best_lr = thres_table_lr.sort_values(\"f1\", ascending=False).head(1)\n",
+        "best_rf = thres_table_rf.sort_values(\"f1\", ascending=False).head(1)\n",
+        "print(\"Best threshold (LR) by F1:\\n\", best_lr)\n",
+        "print(\"\\nBest threshold (RF) by F1:\\n\", best_rf)\n"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "id": "064c9658",
+      "metadata": {},
+      "source": [
+        "### Feature Importance (Random Forest)"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "id": "3ec90630",
+      "metadata": {},
+      "outputs": [],
+      "source": [
+        "\n",
+        "ohe = log_reg.named_steps['preprocess'].named_transformers_['cat']\n",
+        "num_features = numeric_cols\n",
+        "cat_features = list(ohe.get_feature_names_out(categorical_cols))\n",
+        "final_feature_names = cat_features + num_features\n",
+        "\n",
+        "rf_model = rf.named_steps['clf']\n",
+        "importances = rf_model.feature_importances_\n",
+        "\n",
+        "feat_imp = (pd.DataFrame({\n",
+        "    \"feature\": final_feature_names,\n",
+        "    \"importance\": importances\n",
+        "}).sort_values(\"importance\", ascending=False))\n",
+        "\n",
+        "feat_imp.head(20)\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "id": "5257760e",
+      "metadata": {},
+      "outputs": [],
+      "source": [
+        "\n",
+        "plt.figure(figsize=(8, 6))\n",
+        "top_k = min(20, len(feat_imp))\n",
+        "plt.barh(feat_imp.head(top_k)['feature'][::-1], feat_imp.head(top_k)['importance'][::-1])\n",
+        "plt.title(\"Random Forest \u2014 Top Feature Importances\")\n",
+        "plt.tight_layout()\n",
+        "plt.show()\n"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "id": "2a81c8e7",
+      "metadata": {},
+      "source": [
+        "## Results Summary & Comparison"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "id": "e3846deb",
+      "metadata": {},
+      "outputs": [],
+      "source": [
+        "\n",
+        "summary = pd.DataFrame({\n",
+        "    \"model\": [\"Logistic Regression\", \"Random Forest\"],\n",
+        "    \"roc_auc\": [roc_lr, roc_rf],\n",
+        "    \"pr_auc\": [pr_lr, pr_rf],\n",
+        "    \"best_f1_threshold\": [float(thres_table_lr.sort_values(\"f1\", ascending=False).head(1)['threshold']),\n",
+        "                          float(thres_table_rf.sort_values(\"f1\", ascending=False).head(1)['threshold'])],\n",
+        "    \"best_f1\": [float(thres_table_lr['f1'].max()), float(thres_table_rf['f1'].max())]\n",
+        "})\n",
+        "summary\n"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "id": "753ce924",
+      "metadata": {},
+      "source": [
+        "### (Optional) Export Predictions"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "id": "7476fece",
+      "metadata": {},
+      "outputs": [],
+      "source": [
+        "\n",
+        "# pd.DataFrame({\"y_true\": y_test, \"proba_lr\": y_proba_lr, \"proba_rf\": y_proba_rf}).to_csv(\"predictions.csv\", index=False)\n"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "id": "a6f7e3ef",
+      "metadata": {},
+      "source": [
+        "## Appendix \u2014 Export Notebook Source as Text"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "id": "aaff55d9",
+      "metadata": {},
+      "outputs": [],
+      "source": [
+        "\n",
+        "import json, pathlib\n",
+        "notebook_path = pathlib.Path(\"Fraud_Detection_Assignment.ipynb\")\n",
+        "with open(notebook_path, \"r\", encoding=\"utf-8\") as f:\n",
+        "    nb_json = json.load(f)\n",
+        "\n",
+        "with open(\"Fraud_Detection_Assignment_source.txt\", \"w\", encoding=\"utf-8\") as f:\n",
+        "    f.write(json.dumps(nb_json, indent=2))\n",
+        "\n",
+        "print(\"Exported to Fraud_Detection_Assignment_source.txt\")\n"
+      ]
+    }
+  ],
+  "metadata": {
+    "kernelspec": {
+      "display_name": ".venv",
+      "language": "python",
+      "name": "python3"
+    },
+    "language_info": {
+      "codemirror_mode": {
+        "name": "ipython",
+        "version": 3
+      },
+      "file_extension": ".py",
+      "mimetype": "text/x-python",
+      "name": "python",
+      "nbconvert_exporter": "python",
+      "pygments_lexer": "ipython3",
+      "version": "3.13.3"
+    }
+  },
+  "nbformat": 4,
+  "nbformat_minor": 5
+}
