@@ -1,94 +1,51 @@
-# Fraud Detection in Financial Transactions
+# Fraud Detection in Financial Transactions (Non-Deep Learning)
 
-Machine learning project on the [Kaggle Fraudulent Transactions dataset](https://www.kaggle.com/datasets/chitwanmanchanda/fraudulent-transactions-data).  
-Implements **Logistic Regression** and **Random Forest** (non–deep learning) for classifying fraudulent financial transactions in a highly imbalanced dataset.
+## Overview
+This repository contains a **time-aware, leakage-safe** fraud detection pipeline using **Logistic Regression** (non-deep learning). It demonstrates industry best practices for tabular ML:
+- **Temporal split** by `step` to prevent look-ahead leakage
+- **scikit-learn Pipeline** with **ColumnTransformer** (scaling + robust `OneHotEncoder(handle_unknown="ignore")`)
+- **Imbalance-aware** training (class_weight="balanced")
+- **Threshold selection** using Fβ and operating constraints (recall floors, alert-rate caps)
+- **Evaluation** using **PR-AUC**, **ROC-AUC**, **Confusion Matrices** (raw & normalized), and PR/ROC curves
+- **Reproducibility** (global seeds + `random_state`)
 
----
+A second model (Random Forest) will be added by a teammate using the **same preprocessor Pipeline**.
 
-## 📌 Project Overview
-- Dataset: ~6.3M rows, 11 features (`step`, `type`, `amount`, balances, etc.), with severe class imbalance (`isFraud` < 0.5%).  
-- Goal: Detect fraudulent transactions while handling imbalance and preventing data leakage.  
-- Models:
-  - Logistic Regression → interpretable baseline with `class_weight="balanced"`.  
-  - Random Forest → nonlinear, robust, provides feature importance.  
-- Evaluation:
-  - ROC-AUC, PR-AUC (suited for imbalance)  
-  - Confusion Matrix, Precision, Recall, F1  
-  - Threshold tuning to analyze precision/recall trade-offs.  
-
----
-
-## 🛠️ Features
-- **Preprocessing**: One-hot encoding, scaling, memory-optimized CSV loading.  
-- **Feature Engineering**: Balance deltas (`tx_delta_orig`, `tx_delta_dest`).  
-- **Time-Aware Split**: Train on early `step` values, test on later steps to avoid leakage.  
-- **Imbalance Handling**: `class_weight` strategy for fair learning.  
-- **Hardware Friendly**: `QUICK_EXPERIMENT` flag to downsample majority class (safe for 8GB RAM).  
-
----
-
-## 📂 Repository Structure
+## Project Structure
 ```
-fraud-detection-ml-assignment/
-│
-├── Fraud_Detection_Assignment.ipynb     # Main notebook
-├── Fraud_Detection_Assignment_source.txt # Exported source for appendix
-├── requirements.txt                     # Dependencies
-│
+.
+├── Fraud_Detection_Assignment.ipynb   # Main notebook
+├── README.md                          # This file
+├── requirements.txt                   # Reproducible environment
+├── members.txt                        # Team members (IDs, names, emails)
+├── submission.txt                     # Dataset + GitHub + YouTube links
 ├── report/
-│   └── Fraud_Detection_Report.pdf       # Final report
-│
-├── submission/
-│   ├── members.txt
-│   └── submission.txt
-│
-└── data/                                # (ignored, store Fraud.csv here)
+│   ├── Fraud_Detection_Report.md      # Report source (convert to PDF)
+│   └── appendix/
+│       └── Fraud_Detection_Assignment_source.txt  # Notebook exported as text (code appendix)
 ```
 
----
+## How to Run
+1. Create a virtual environment and install dependencies:
+   ```bash
+   python -m venv .venv
+   .venv\Scripts\activate    # Windows
+   # source .venv/bin/activate # Linux/Mac
+   pip install -r requirements.txt
+   ```
+2. Launch Jupyter and open `Fraud_Detection_Assignment.ipynb`:
+   ```bash
+   jupyter lab
+   ```
+3. Execute cells top-to-bottom. Ensure the dataset CSV is available or download via the link in `submission.txt`.
 
-## 🚀 Getting Started
+## Reproducibility
+- All models use `random_state=42`. Set `PYTHONHASHSEED=0` if you want absolute determinism.
+- Temporal split is performed by `time_aware_split(...)` with hard assertions that prove **train ≤ cutoff** and **test > cutoff(+gap)**.
 
-### 1. Clone the repo
-```bash
-git clone https://github.com/<your-username>/fraud-detection-ml-assignment.git
-cd fraud-detection-ml-assignment
-```
+## Notes
+- For thresholding policy, we recommend **Recall ≥ 0.95** then maximize **Precision**, subject to your alert budget.
+- To add Random Forest, reuse the same `preprocess` transformer and swap the classifier.
 
-### 2. Install dependencies
-```bash
-pip install -r requirements.txt
-```
-
-### 3. Download the dataset
-- Get **Fraud.csv** from Kaggle:  
-  [Fraudulent Transactions Dataset](https://www.kaggle.com/datasets/chitwanmanchanda/fraudulent-transactions-data)  
-- Place it in the `data/` folder.  
-- Or let the notebook auto-download using the Kaggle API.
-
-### 4. Run the notebook
-Open Jupyter and run:
-```bash
-jupyter notebook Fraud_Detection_Assignment.ipynb
-```
-
----
-
-## 📊 Results
-- **Logistic Regression**: Strong baseline, interpretable.  
-- **Random Forest**: Better PR-AUC, highlights key transaction features.  
-- Both evaluated with precision/recall trade-offs to balance fraud detection vs false positives.  
-
----
-
-## 📎 Submission Files
-- `members.txt` → group member details  
-- `submission.txt` → dataset link, repo link, YouTube video link  
-
----
-
-## 👤 Author
-- **N.G.S.D. Nanayakkara (MS25948592)** – Sri Lanka Institute of Information Technology (SLIIT)  
-- MSc in Artificial Intelligence  
-
----
+## License
+Educational use for coursework submission; dataset license per original provider.
