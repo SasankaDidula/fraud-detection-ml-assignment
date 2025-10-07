@@ -1,0 +1,7 @@
+Metric,Logistic Regression,Random Forest
+Precision,[From Teammate],1.0000
+Recall,[From Teammate],0.9995
+F1-Score,[From Teammate],0.9998
+ROC-AUC,[From Teammate],1.0000
+Training Time,Fast,Moderate
+Interpretability,High,Medium
