@@ -1,0 +1,21 @@
+feature,importance,category
+origBalanceError,0.2895031124890637,Engineered
+amountToOrigRatio,0.20090685797989602,Engineered
+newbalanceOrig,0.10055907371925954,Original
+origZeroBalanceAfter,0.0924505898264091,Engineered
+oldbalanceOrg,0.08219849280264938,Original
+amountToDestRatio,0.050218602589410716,Engineered
+txn_PAYMENT,0.04097292131179041,Transaction Type
+amount,0.02985771700111873,Original
+highRiskTxn,0.027080981884732437,Engineered
+txn_TRANSFER,0.016719593166087593,Transaction Type
+destBalanceError,0.014646601074359654,Engineered
+txn_CASH_IN,0.013777911513921843,Transaction Type
+txn_CASH_OUT,0.01352349014954254,Transaction Type
+hourOfDay,0.012464923147606404,Engineered
+newbalanceDest,0.004341161328141712,Original
+destZeroBalanceBefore,0.003718632597607538,Engineered
+oldbalanceDest,0.002501603796792053,Original
+dayOfMonth,0.0022419241914554,Engineered
+step,0.0021592350701067843,Original
+txn_DEBIT,0.0001565743600486118,Transaction Type
