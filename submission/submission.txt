@@ -2,4 +2,4 @@ DATASET: Kaggle - PaySim (Financial transactions simulation)
 https://www.kaggle.com/datasets/ealaxi/paysim1
 
 GITHUB: https://github.com/SasankaDidula/fraud-detection-ml-assignment.git
-YOUTUBE: https://youtu.be/<your-video-id>
+YOUTUBE: https://youtu.be/lEaITRRXbcY
