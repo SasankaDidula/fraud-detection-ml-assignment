@@ -1,0 +1,51 @@
+==== Exploratory Data Analysis ====
+Median fraud amount: 143,032 units
+Median legitimate amount: 81,357 units
+% fraudulent CASH_OUT with origin drained (newbalanceOrig==0): 99.17%
+% fraudulent TRANSFER with dest unchanged: 83.93%
+
+==== Logistic Regression (Results at Optimal Threshold) ====
+Threshold: 0.0060
+Precision: 0.0011
+Recall: 1.0000
+F1-Score: 0.0022
+ROC-AUC: 0.9717
+PR-AUC: 0.4505
+TP: 13
+FP: 11,761
+FN: 0
+TN: 47,095
+False Positive Rate: 11,761 / 58,856 = 19.9827%
+Alerts generated: 11,774 of 58,869 = 20.00%
+Training time: 0.01 min; Prediction: 0.0017 ms/example
+
+==== Random Forest (Results at Optimal Threshold) ====
+Threshold: 0.0632
+Precision: 0.0110
+Recall: 1.0000
+F1-Score: 0.0218
+ROC-AUC: 0.9985
+PR-AUC: 0.9180
+TP: 13
+FP: 1,165
+FN: 0
+TN: 57,691
+False Positive Rate: 1,165 / 58,856 = 1.9794%
+Alerts generated: 1,178 of 58,869 = 2.00%
+Training time: 0.01 min; Prediction: 0.0032 ms/example
+
+==== Comparative Analysis ====
+Precision @ Recall≥95% — LR: 0.0011, RF: 0.0110
+Recall — LR: 1.0000, RF: 1.0000
+F1-Score — LR: 0.0022, RF: 0.0218
+ROC-AUC — LR: 0.9717, RF: 0.9985
+PR-AUC — LR: 0.4505, RF: 0.9180
+Training time ratio (RF/LR): 0.65 → RF ~1.5× faster
+Prediction time ratio (RF/LR): 1.91 → LR ~1.9× faster per example
+
+Top 5 Features by RF importance:
+1. tx_delta_orig (24.07% importance)
+2. orig_balance_ratio (17.89% importance)
+3. newbalanceOrig (8.70% importance)
+4. origZeroBalanceAfter (8.47% importance)
+5. hourOfDay (6.30% importance)

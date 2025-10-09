@@ -1,0 +1,24 @@
+LR Results (optimized threshold)
+---------------------------------
+Threshold (τ): 0.000041
+
+Precision: 0.000960
+Recall: 1.000000
+F1-Score: 0.001918
+ROC-AUC: 0.965661
+PR-AUC: 0.536517
+
+Confusion Matrix:
+TN: 45,329
+FP: 13,527
+FN: 0
+TP: 13
+
+False Positive Rate: 13527 / 58856 = 22.983213%
+Alerts generated: 13540 of 58,869 = 23.000221%
+
+Medians & Observations for EDA:
+Median fraud amount: 143,032
+Median legitimate amount: 81,357
+% fraudulent CASH_OUT draining origin to 0: 99.17%
+% fraudulent TRANSFER with unchanged destination balance: 83.93%

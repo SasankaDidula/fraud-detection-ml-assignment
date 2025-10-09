@@ -2,3 +2,5 @@ data/
 *.csv
 *.zip
 *.ipynb_checkpoints/
+
+venv/

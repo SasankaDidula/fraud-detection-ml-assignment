@@ -1,3 +1,2 @@
-MS25948592, Didula Nanayakkara, <your_email@domain.com>
-<YourID2>, <Teammate 2 Name>, <teammate2@domain.com>
-<YourID3>, <Teammate 3 Name>, <teammate3@domain.com>
+MS25948592, N.G.S.D. Nanayakkara, MS25948592@my.sliit.lk
+MS25951608, N.A. Kaluarachchi, MS25951608@my.sliit.lk
