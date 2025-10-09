@@ -3,8 +3,8 @@
 # ============================================================================
 # Course: IT5022 - Fundamentals of Machine Learning (MSc AI)
 # Team Members:
-#   - [Teammate Name/ID] - Logistic Regression, Threshold Tuning
-#   - MS25948592 (N.G.S.D. Nanayakkara) - Feature Engineering, Random Forest
+#   - MS25948592 (N.G.S.D. Nanayakkara) - Logistic Regression, Threshold Tuning
+#   - MS25951608 (N.A.Kaluarachchi) - Feature Engineering, Random Forest
 # Dataset: Fraudulent Transactions Data (Kaggle)
 # Models: Logistic Regression (baseline) & Random Forest (ensemble)
 # ============================================================================
